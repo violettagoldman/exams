@@ -6,34 +6,37 @@
 /*   By: vgoldman <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2019/12/03 13:40:09 by vgoldman          #+#    #+#             */
-/*   Updated: 2019/12/03 16:25:18 by vgoldman         ###   ########.fr       */
+/*   Updated: 2019/12/04 19:36:13 by vgoldman         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include <unistd.h>
 #include <stdarg.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 typedef struct	s_format
 {
 	int		size;
 	int		width;
+	int		wd;
+	int		sd;
 	char	spec;
 }				t_format;
 
 void	handle_format(char **ptr, va_list args, int *count);
-void	ws(char **ptr, t_format *format, va_list args);
 int		ft_atoi(char **str);
 int		isdigit(int n);
 int		ft_abs(int n);
 void	ft_putnchar(char c, int n, int *count);
 int		ft_strlen(char *str);
-void	ft_putnbr(int nb, int *count);
+void	ft_putnbr(long int nb, int *count);
 void	ft_puthexa(long int nb, int *count);
 void	ft_putnstr(char *str, int n, int *count);
 void	ft_string(char *str, t_format *format, int *count);
 void	ft_int(int i, t_format *format, int *count);
-int		len_nb(int n);
+int		len_nb(long int n);
+void	ft_hexa(long int i, t_format *format, int *count);
 
 int		ft_printf(const char *format, ...)
 {
@@ -64,38 +67,28 @@ void	handle_format(char **ptr, va_list args, int *count)
 
 	format.size = 0;
 	format.width = 0;
-	ws(ptr, &format, args);
+	format.wd = 0;
+	format.sd = 0;
+	if (isdigit(**ptr))
+	{
+		format.width = ft_atoi(ptr);
+		format.wd = 1;
+	}
+	if (**ptr == '.')
+	{
+		(*ptr)++;
+		format.size = ft_atoi(ptr);
+		format.sd = 1;
+	}
 	format.spec = **ptr;
 	if (**ptr != '\0')
 		(*ptr)++;
 	if (format.spec == 's')
-		ft_string(va_arg(args, int), &format, count);
+		ft_string(va_arg(args, char*), &format, count);
 	else if (format.spec == 'd')
-		ft_int(va_arg(args, char*), &format, count);
+		ft_int(va_arg(args, int), &format, count);
 	else if (format.spec == 'x')
 		ft_hexa(va_arg(args, int), &format, count);
-}
-
-void	ws(char **ptr, t_format *format, va_list args)
-{
-	if (**ptr == '*')
-	{
-		format->width = va_arg(args, int);
-		(*ptr)++;
-	}
-	else if (isdigit(**ptr))
-		format->width = ft_atoi(ptr);
-	if (**ptr == '.')
-	{
-		(*ptr)++;
-		if (**ptr == '*')
-		{
-			format->size = va_arg(args, int);
-			(*ptr)++;
-		}
-		else
-			format->size = ft_atoi(ptr);
-	}
 }
 
 int		ft_atoi(char **str)
@@ -103,6 +96,8 @@ int		ft_atoi(char **str)
 	int res;
 	int sign;
 
+	sign = 1;
+	res = 0;
 	if (**str == '-')
 	{
 		sign *= -1;
@@ -149,9 +144,9 @@ int		ft_strlen(char *str)
 	return (i);
 }
 
-void	ft_putnbr(int nb, int *count)
+void	ft_putnbr(long int nb, int *count)
 {
-	int a;
+	long int a;
 
 	a = nb;
 	if (a < 0)
@@ -193,9 +188,9 @@ void	ft_putnstr(char *str, int n, int *count)
 	}
 }
 
-int		len_nb(int n)
+int		len_nb(long int n)
 {
-	int i;
+	long int i;
 
 	i = 0;
 	if (n < 0)
@@ -211,40 +206,84 @@ int		len_nb(int n)
 	return (i + 1);
 }
 
+int		len_nb_hexa(long int n)
+{
+	int i;
+
+	i = 0;
+	while (n >= 16)
+	{
+		n /= 16;
+		i++;
+	}
+	return (i + 1);
+}
+
 void	ft_string(char *str, t_format *format, int *count)
 {
 	int fill;
-	int print_len;
+	int len;
+	int i;
 
 	if (str == NULL)
 	{
 		ft_string("(null)", format, count);
 		return ;
 	}
-	if (ft_abs(format->size) < ft_strlen(str) && format->size)
-		print_len = ft_abs(format->size);
-	else
-		print_len = ft_strlen(str);
-	fill = ft_abs(format->width) - print_len;
+	fill = 0;
+	len = ft_strlen(str);
+	i = 0;
+	if (format->sd && format->size < len)
+		len = format->size;
+	if (format->wd && format->width > len)
+		fill = format->width - len;
 	ft_putnchar(' ', fill, count);
-	ft_putnstr(str, print_len, count);
+	ft_putnstr(str, len, count);
 }
 
 void	ft_int(int i, t_format *format, int *count)
 {
-	int fill_spaces;
-	int fill_zeros;
+	long int n = i;
+	int len = len_nb(n);
+	int fill_s = 0;
+	int fill_z = 0;
 
-	if (format->size >= len_nb(i) || (format->width && format->size))
-		fill_zeros = ft_abs(format->size) - len_nb(i) + (i < 0 && format->size > 0);
-	else if (format->width > 0)
-		fill_zeros = ft_abs(format->width) - len_nb(i);
-	if (ft_abs(format->width) > len_nb + fill_zeros)
-	{
-		fill_spaces = ft_abs(format->width) - len_nb(i) - (fill_zeros < 0 ? 0 : fill_zeros);
-	}
+	if (format->sd && format->size > len)
+		fill_z = format->size - len + (n < 0);
+	if (format->wd && format->width > fill_z + len)
+		fill_s = format->width - fill_z - len;
+	ft_putnchar(' ', fill_s, count);
 	if (i < 0)
 		ft_putnchar('-', 1, count);
-	ft_putnchar('0', fill_zeros, count);
-	ft_putnbr(i, count);
+	ft_putnchar('0', fill_z, count);
+	//if (!(format->sd && !format->size && !n))
+	ft_putnbr(n, count);
+}
+
+void	ft_hexa(long int i, t_format *format, int *count)
+{
+	if (i < 0)
+		i += 4294967296;
+	int len = len_nb_hexa(i);
+	int fill_s = 0;
+	int fill_z = 0;
+
+	if (format->sd && format->size > len)
+		fill_z = format->size - len;
+	if (format->wd && format->width > fill_z + len)
+		fill_s = format->width - fill_z - len;
+	ft_putnchar(' ', fill_s, count);
+	ft_putnchar('0', fill_z, count);
+	ft_puthexa(i, count);
+}
+
+#include <stdio.h>
+
+int main(void)
+{
+	//char *c = "15.2";
+	//printf("|%d|", ft_atoi(&c));
+	printf("|%d|", printf("%15.10x\n", -2147483647));
+	printf("|%d|", ft_printf("%15.10x\n", -2147483647));
+	return (0);
 }
